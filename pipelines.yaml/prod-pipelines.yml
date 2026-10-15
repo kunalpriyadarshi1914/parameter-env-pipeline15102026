@@ -1,0 +1,113 @@
+trigger:
+- main
+- feature/*
+
+parameters:
+- name: KyaScanChalega
+  displayName: scan chalega kya??????
+  type: string
+  values: 
+  - chalega bhai
+  - nahi chalega bhai
+
+
+- name: KyaPlanChalega
+  displayName: plan chalega kya??????
+  type: string
+  values: 
+  - chalega bhai
+  - nahi chalega bhai
+
+
+- name: KyaApplyChalega
+  displayName: apply chalega kya??????
+  type: string
+  values: 
+  - chalega bhai
+  - nahi chalega bhai
+
+pool: env-pool
+
+stages:
+  - stage: scannigtool
+    displayName: bhai scan tool hai yeh
+    condition: eq('${{ parameters.KyaScanChalega }}', 'chalega bhai')
+    jobs:
+      - job: scan
+        steps:
+          - task: PowerShell@2
+            inputs:
+              targetType: 'inline'
+              script: 'trufflehog filesystem . --results=verified,unknown "$(Build.SourcesDirectory)/parent_modules/prod"'
+
+  - stage: InitandPlan
+    displayName: init and Plan
+    condition: eq('${{ parameters.KyaPlanChalega }}', 'chalega bhai')
+    jobs:
+      - job: initandplan
+        steps:
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/prod'
+            backendServiceArm: 'env-svc'
+            backendAzureRmStorageAccountName: 'parameterstg'
+            backendAzureRmContainerName: 'parametercnt1'
+            backendAzureRmKey: 'parameter.tfstate'
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'plan'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/prod'
+            environmentServiceNameAzureRM: 'env-svc'
+
+  - stage: ManualApproval
+    displayName: bhai approval de pahle
+    condition: and(
+            succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        eq('${{ parameters.KyaApplyChalega }}', 'chalega bhai')
+      )
+    pool: server
+    jobs:
+      - job: 
+        steps:
+          - task: ManualValidation@1
+            inputs:
+              notifyUsers: 'kp4u2011@gmail.com'
+
+  - stage: InitandApply
+    displayName: init and apply
+    condition: and(
+            succeeded(),
+        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+        eq('${{ parameters.KyaApplyChalega }}', 'chalega bhai')
+      )
+    jobs:
+      - job: initandapply
+        steps:
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'init'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/prod'
+            backendServiceArm: 'env-svc'
+            backendAzureRmStorageAccountName: 'parameterstg'
+            backendAzureRmContainerName: 'parametercnt1'
+            backendAzureRmKey: 'parameter.tfstate'
+
+        - task: TerraformTask@5
+          inputs:
+            provider: 'azurerm'
+            command: 'apply'
+            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/prod'
+            environmentServiceNameAzureRM: 'env-svc'
+
+        
+
+        
+
+        
+        
+        
