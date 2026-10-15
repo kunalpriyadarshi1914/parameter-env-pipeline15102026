@@ -1,113 +1,142 @@
+
 trigger:
-- main
-- feature/*
+  branches:
+    include:
+      - main
+      - feature/*
+  paths:
+    include:
+      - parent_modules/dev/**
 
 parameters:
 - name: KyaScanChalega
-  displayName: scan chalega kya??????
+  displayName: 'Dev Scan chalega kya?'
   type: string
-  values: 
-  - chalega bhai
-  - nahi chalega bhai
-
+  default: 'chalega bhai'
+  values:
+    - 'chalega bhai'
+    - 'nahi chalega bhai'
 
 - name: KyaPlanChalega
-  displayName: plan chalega kya??????
+  displayName: 'Dev Plan chalega kya?'
   type: string
-  values: 
-  - chalega bhai
-  - nahi chalega bhai
-
+  default: 'chalega bhai'
+  values:
+    - 'chalega bhai'
+    - 'nahi chalega bhai'
 
 - name: KyaApplyChalega
-  displayName: apply chalega kya??????
+  displayName: 'Dev Apply chalega kya?'
   type: string
-  values: 
-  - chalega bhai
-  - nahi chalega bhai
+  default: 'chalega bhai'
+  values:
+    - 'chalega bhai'
+    - 'nahi chalega bhai'
 
 pool: env-pool
 
 stages:
-  - stage: scannigtool
-    displayName: bhai scan tool hai yeh
-    condition: eq('${{ parameters.KyaScanChalega }}', 'chalega bhai')
-    jobs:
-      - job: scan
-        steps:
-          - task: PowerShell@2
-            inputs:
-              targetType: 'inline'
-              script: 'trufflehog filesystem . --results=verified,unknown "$(Build.SourcesDirectory)/parent_modules/dev"'
+- stage: Scan
+  displayName: 'Dev Secret Scan'
+  condition: eq('${{ parameters.KyaScanChalega }}', 'chalega bhai')
+  jobs:
+  - job: DevScan
+    steps:
+    - checkout: self
+    - task: PowerShell@2
+      inputs:
+        targetType: inline
+        script: |
+          $path = "$(Build.SourcesDirectory)/parent_modules/dev"
+          if (!(Test-Path $path)) { throw "Dev directory not found" }
+          trufflehog filesystem "$path" --results=verified,unknown
 
-  - stage: InitandPlan
-    displayName: init and Plan
-    condition: eq('${{ parameters.KyaPlanChalega }}', 'chalega bhai')
-    jobs:
-      - job: initandplan
-        steps:
-        - task: TerraformTask@5
-          inputs:
-            provider: 'azurerm'
-            command: 'init'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/dev'
-            backendServiceArm: 'env-svc'
-            backendAzureRmStorageAccountName: 'parameterstg'
-            backendAzureRmContainerName: 'parametercnt1'
-            backendAzureRmKey: 'parameter.tfstate'
-        - task: TerraformTask@5
-          inputs:
-            provider: 'azurerm'
-            command: 'plan'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/dev'
-            environmentServiceNameAzureRM: 'env-svc'
+- stage: Plan
+  displayName: 'Dev Terraform Init and Plan'
+  dependsOn: Scan
+  condition: |
+    and(
+      in(dependencies.Scan.result, 'Succeeded', 'Skipped'),
+      eq('${{ parameters.KyaPlanChalega }}', 'chalega bhai')
+    )
+  jobs:
+  - job: DevPlan
+    steps:
+    - checkout: self
+    - task: TerraformTask@5
+      displayName: 'Dev Init'
+      inputs:
+        provider: azurerm
+        command: init
+        workingDirectory: '$(Build.SourcesDirectory)/parent_modules/dev'
+        backendServiceArm: 'env-svc'
+        backendAzureRmStorageAccountName: 'parameterstg'
+        backendAzureRmContainerName: 'parametercnt1'
+        backendAzureRmKey: 'dev.tfstate'
 
-  - stage: ManualApproval
-    displayName: bhai approval de pahle
-    condition: and(
-            succeeded(),
-        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
-        eq('${{ parameters.KyaApplyChalega }}', 'chalega bhai')
-      )
-    pool: server
-    jobs:
-      - job: 
-        steps:
-          - task: ManualValidation@1
-            inputs:
-              notifyUsers: 'kp4u2011@gmail.com'
+    - task: TerraformTask@5
+      displayName: 'Dev Plan'
+      inputs:
+        provider: azurerm
+        command: plan
+        workingDirectory: '$(Build.SourcesDirectory)/parent_modules/dev'
+        environmentServiceNameAzureRM: 'env-svc'
 
-  - stage: InitandApply
-    displayName: init and apply
-    condition: and(
-            succeeded(),
-        eq(variables['Build.SourceBranch'], 'refs/heads/main'),
-        eq('${{ parameters.KyaApplyChalega }}', 'chalega bhai')
-      )
-    jobs:
-      - job: initandapply
-        steps:
-        - task: TerraformTask@5
-          inputs:
-            provider: 'azurerm'
-            command: 'init'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/dev'
-            backendServiceArm: 'env-svc'
-            backendAzureRmStorageAccountName: 'parameterstg'
-            backendAzureRmContainerName: 'parametercnt1'
-            backendAzureRmKey: 'parameter.tfstate'
+- stage: Approval
+  displayName: 'Approve Dev Apply'
+  dependsOn: Plan
+  condition: |
+    and(
+      succeeded(),
+      eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+      eq('${{ parameters.KyaPlanChalega }}', 'chalega bhai'),
+      eq('${{ parameters.KyaApplyChalega }}', 'chalega bhai')
+    )
+  pool: server
+  jobs:
+  - job: DevApproval
+    timeoutInMinutes: 1440
+    steps:
+    - task: ManualValidation@1
+      timeoutInMinutes: 1440
+      inputs:
+        notifyUsers: 'kp4u2011@gmail.com'
+        approvers: 'kp4u2011@gmail.com'
+        instructions: 'Approve Dev infrastructure changes.'
+        onTimeout: reject
 
-        - task: TerraformTask@5
-          inputs:
-            provider: 'azurerm'
-            command: 'apply'
-            workingDirectory: '$(System.DefaultWorkingDirectory)/parent_modules/dev'
-            environmentServiceNameAzureRM: 'env-svc'
+- stage: Apply
+  displayName: 'Dev Terraform Apply'
+  dependsOn:
+    - Plan
+    - Approval
+  condition: |
+    and(
+      succeeded(),
+      eq(variables['Build.SourceBranch'], 'refs/heads/main'),
+      eq('${{ parameters.KyaPlanChalega }}', 'chalega bhai'),
+      eq('${{ parameters.KyaApplyChalega }}', 'chalega bhai')
+    )
+  jobs:
+  - job: DevApply
+    steps:
+    - checkout: self
+    - task: TerraformTask@5
+      displayName: 'Dev Init'
+      inputs:
+        provider: azurerm
+        command: init
+        workingDirectory: '$(Build.SourcesDirectory)/parent_modules/dev'
+        backendServiceArm: 'env-svc'
+        backendAzureRmStorageAccountName: 'parameterstg'
+        backendAzureRmContainerName: 'parametercnt1'
+        backendAzureRmKey: 'dev.tfstate'
 
-        
+    - task: TerraformTask@5
+      displayName: 'Dev Apply'
+      inputs:
+        provider: azurerm
+        command: apply
+        workingDirectory: '$(Build.SourcesDirectory)/parent_modules/dev'
+        environmentServiceNameAzureRM: 'env-svc'
 
-        
-
-        
-        
-        
