@@ -70,8 +70,8 @@ stages:
         command: init
         workingDirectory: '$(Build.SourcesDirectory)/parent_modules/dev'
         backendServiceArm: 'env-svc'
-        backendAzureRmStorageAccountName: 'parameterstg'
-        backendAzureRmContainerName: 'parametercnt1'
+        backendAzureRmStorageAccountName: 'parastg1914'
+        backendAzureRmContainerName: 'parastgcontainer'
         backendAzureRmKey: 'dev.tfstate'
 
     - task: TerraformTask@5
@@ -128,8 +128,8 @@ stages:
         command: init
         workingDirectory: '$(Build.SourcesDirectory)/parent_modules/dev'
         backendServiceArm: 'env-svc'
-        backendAzureRmStorageAccountName: 'parameterstg'
-        backendAzureRmContainerName: 'parametercnt1'
+        backendAzureRmStorageAccountName: 'parastg1914'
+        backendAzureRmContainerName: 'parastgcontainer'
         backendAzureRmKey: 'dev.tfstate'
 
     - task: TerraformTask@5
